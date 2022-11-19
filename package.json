@@ -1,0 +1,19 @@
+{
+  "name": "giraffe",
+  "version": "1.0.0",
+  "description": "",
+  "dependencies": {
+    "pixi.js": "^7.0.4"
+  },
+  "devDependencies": {
+    "parcel": "^2.8.0",
+    "punycode": "^1.4.1",
+    "querystring-es3": "^0.2.1"
+  },
+  "scripts": {
+    "start": "parcel index.html assets/**",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC"
+}
