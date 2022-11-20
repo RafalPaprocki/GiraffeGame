@@ -3,9 +3,14 @@
   "version": "1.0.0",
   "description": "",
   "dependencies": {
+    "@mediapipe/camera_utils": "^0.3.1640029074",
+    "@mediapipe/drawing_utils": "^0.3.1620248257",
+    "@mediapipe/hands": "^0.4.1646424915",
+    "device-detector-js": "^3.0.3",
     "pixi.js": "^7.0.4"
   },
   "devDependencies": {
+    "@parcel/transformer-sass": "^2.8.0",
     "parcel": "^2.8.0",
     "punycode": "^1.4.1",
     "querystring-es3": "^0.2.1"

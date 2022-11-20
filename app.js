@@ -1,13 +1,22 @@
 import {Application, Assets, Sprite, utils} from 'pixi.js';
-const app = new Application();
+import { mediaPipeInit } from './handDetection';
+
+const CONTAINER_WIDTH = 900;
+const CONTAINER_HEIGHT = 640;
+
 
 // The application will create a canvas element for you that you
 // can then insert into the DOM
-(async ()=> {
-    document.body.appendChild(app.view);
+async function pixiInit(container = document.body, viewWidth = CONTAINER_WIDTH, viewHeight = CONTAINER_HEIGHT) {
+    const app = new Application({
+        width: CONTAINER_WIDTH,
+        height: CONTAINER_HEIGHT,
+    });
+
+    container.appendChild(app.view);
 
     // load the texture we need
-    const texture = await Assets.load("assets/pobrane.png");
+    const texture = await Assets.load("assets/bunny.png");
 
     // This creates a texture from a 'bunny.png' image
     const bunny = new Sprite(texture);
@@ -28,4 +37,12 @@ const app = new Application();
         // each frame we spin the bunny around a bit
         bunny.rotation += 0.01;
     })
-})();
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+    const container = document.querySelector('.container');
+    container.style.width = CONTAINER_WIDTH + 'px';
+    container.style.height = CONTAINER_HEIGHT + 'px';
+    pixiInit(container);
+    mediaPipeInit(container);
+});
