@@ -1,6 +1,8 @@
 import { Hands, HAND_CONNECTIONS, Results } from "@mediapipe/hands";
 import { drawConnectors, drawLandmarks, lerp } from "@mediapipe/drawing_utils";
 import { Camera } from "@mediapipe/camera_utils";
+import { drawCircle, drawLine, forEachLandmarks, landmarkScaler, scaleLandmark, withCanvas } from "./utils";
+import { INDEX_FINGER_TIP, THUMB_TIP } from "./HandLandmarks";
 
 console.log('Initializing hands detection...')
 const _hands = new Hands({
@@ -15,6 +17,7 @@ _hands.setOptions({
 });
 
 let _overlayCanvasCtx;
+let _containerWidth, _containerHeight;
 
 const _eventHandlers = {
 	pointTip: [],
@@ -23,6 +26,15 @@ const _eventHandlers = {
 	pinchMove: [],
 };
 export const GESTURE_EVENTS = Object.keys(_eventHandlers);
+
+const _gestureState = {
+	pinch: {
+		pinched: false,
+	}
+};
+
+const PINCH_THRESHOLD = 0.08;
+const PINCH_RELEASE_THRESHOLD = 0.12;
 
 
 /**
@@ -37,13 +49,15 @@ let _lastHandsResults = null;
  * @param container {HTMLElement}
  */
 export function mediaPipeInit(container) {
+	_containerWidth = container.offsetWidth;
+	_containerHeight = container.offsetHeight;
 	const videoElement = document.createElement('video');
-	videoElement.width = container.offsetWidth;
-	videoElement.height = container.offsetHeight;
+	videoElement.width = _containerWidth;
+	videoElement.height = _containerHeight;
 	videoElement.classList.add('input_video');
 	const canvasElement = document.createElement('canvas');
-	canvasElement.width = container.offsetWidth;
-	canvasElement.height = container.offsetHeight;
+	canvasElement.width = _containerWidth;
+	canvasElement.height = _containerHeight;
 	canvasElement.classList.add('output_canvas', 'selfie')
 	container.appendChild(videoElement);
 	container.appendChild(canvasElement);
@@ -84,7 +98,7 @@ export function removeEventHandler(eventName, handler) {
  */
 function _fireEvent(eventName, eventData) {
 	if (GESTURE_EVENTS.includes(eventName)) {
-		_eventHandlers.forEach((handler) => handler(eventData));
+		_eventHandlers[eventName].forEach((handler) => handler(eventData));
 	}
 }
 
@@ -99,9 +113,17 @@ function _onResults(results) {
 		_lastHandsResults = results;
 		withCanvas(_overlayCanvasCtx, (ctx) => {
 			if (SHOW_VIDEO) ctx.drawImage(results.image, 0, 0, ctx.canvas.width, ctx.canvas.height);
-			_drawHandOverlays(results, ctx);
+			// _drawHandOverlays(results, ctx);
 		});
-		_calcPinchDistance(results);
+		const pinchMeasurement = _calcPinchDistance(results)[0];
+		console.log('pinchMeasurement', pinchMeasurement);
+		if (!_gestureState.pinch.pinched && pinchMeasurement.pinchDist < PINCH_THRESHOLD) {
+			_gestureState.pinch.pinched = true;
+			_fireEvent('pinch', { pinched: true, ...pinchMeasurement });
+		} else if (_gestureState.pinch.pinched && pinchMeasurement.pinchDist > PINCH_RELEASE_THRESHOLD) {
+			_gestureState.pinch.pinched = false;
+			_fireEvent('pinchRelease', { pinched: false, ...pinchMeasurement });
+		}
 	} else {
 		_lastHandsResults = null;
 		withCanvas(_overlayCanvasCtx, (ctx) => {
@@ -116,7 +138,7 @@ function _onResults(results) {
  * @param {CanvasRenderingContext2D} canvasCtx
  */
 const _drawHandOverlays = (results, canvasCtx) => {
-	forEachLandmarks(results, ({landmarks, isRightHand}) => {
+	forEachLandmarks(results, ({ landmarks, isRightHand }) => {
 		drawConnectors(
 			canvasCtx, landmarks, HAND_CONNECTIONS,
 			{ color: isRightHand ? '#00FF00' : '#FF0000' }
@@ -136,42 +158,42 @@ const _drawHandOverlays = (results, canvasCtx) => {
  * @param {Results} results Hands detestion results
  */
 const _calcPinchDistance = (results) => {
-	return -1;
+	console.log('calcPichDist  start')
+	return forEachLandmarks(results, ({ landmarks }) => {
+		console.log('calcPichDist  forEach iteration')
+		const scaleLandmark = landmarkScaler(_containerWidth, _containerHeight);
+		const indexFingertipRaw = landmarks[INDEX_FINGER_TIP];
+		const thumbFingertipRaw = landmarks[THUMB_TIP];
+		const indexFingertip = scaleLandmark(indexFingertipRaw);
+		const thumbFingertip = scaleLandmark(thumbFingertipRaw);
+		console.log('calcPinchDist: index', indexFingertipRaw.x, indexFingertipRaw.y, indexFingertipRaw.z)
+		console.log('calcPinchDist: thumb', thumbFingertipRaw.x, thumbFingertipRaw.y, thumbFingertipRaw.z)
+		const pinchDist = _euclideanDistance(indexFingertipRaw.x, thumbFingertipRaw.x, indexFingertipRaw.y, thumbFingertipRaw.y)
+		const pinchDistRawPercent = Math.round(100 * pinchDist);
+		withCanvas(_overlayCanvasCtx, _markPinchDist(pinchDistRawPercent, indexFingertip, thumbFingertip), false);
+
+		const lineMiddlePoint = (x0, x1) => x0 + ((x1 - x0) / 2);
+		return {
+			pinchDist,
+			middleX: lineMiddlePoint(indexFingertip.x, thumbFingertip.x),
+			middleY: lineMiddlePoint(indexFingertip.y, thumbFingertip.y),
+		};
+	});
 };
 
+const _euclideanDistance = (x0, x1, y0, y1) => {
+	const dX = x1 - x0;
+	const dY = y1 - y0;
+	return Math.sqrt(dX ** 2 + dY ** 2);
+};
 
-const clearCanvas = (canvasCtx) => {
-	const { canvas } = canvasCtx;
-	canvasCtx.clearRect(0, 0, canvas.width, canvas.height);
-}
-
-/**
- * @param {CanvasRenderingContext2D} canvasCtx Canvas 2D context
- */
- const withCanvas = (canvasCtx, drawingFunction) => {
-	canvasCtx.save();
-	clearCanvas(canvasCtx);
-	if (typeof drawingFunction === 'function') {
-		drawingFunction(canvasCtx);
-	}
-	canvasCtx.restore();
-}
-
-/**
- * Do something for each result landmark
- * @param {Results} results
- * @param {Funnction} callback Calback to run for each result
- */
-export const forEachLandmarks = (results, callback) => {
-	for (let index = 0; index < results.multiHandLandmarks.length; index++) {
-		const classification = results.multiHandedness[index];
-		const isRightHand = classification.label === 'Right';
-		const landmarks = results.multiHandLandmarks[index];
-		const worldLandmarks = results.multiHandWorldLandmarks[index];
-		callback({
-			isRightHand,
-			landmarks,
-			worldLandmarks,
-		});
-	}
-}
+const _markPinchDist = (pinchDist, indexFingertip, thumbFingertip) => (ctx) => {
+	drawLine(ctx, indexFingertip.x, indexFingertip.y, thumbFingertip.x, thumbFingertip.y, '#BADA55');
+	drawCircle(ctx, indexFingertip.x, indexFingertip.y, 5, 'blue');
+	drawCircle(ctx, thumbFingertip.x, thumbFingertip.y, 5, 'red');
+	const lineMiddlePoint = (x0, x1) => x0 + ((x1 - x0) / 2);
+	const middleX = lineMiddlePoint(indexFingertip.x, thumbFingertip.x);
+	const middleY = lineMiddlePoint(indexFingertip.y, thumbFingertip.y);
+	ctx.font = '25px serif-sans';
+	ctx.fillText(pinchDist, middleX, middleY);
+};

@@ -1,7 +1,7 @@
 import {
-	Application,
-	Assets,
-	Sprite
+    Application,
+    Assets,
+    Sprite,
 } from 'pixi.js';
 
 import { lerp } from '@mediapipe/drawing_utils';
@@ -9,9 +9,13 @@ import { extensions } from '@pixi/core';
 import { InteractionManager } from '@pixi/interaction';
 extensions.add(InteractionManager);
 
-import { forEachLandmarks, getLastHandsResults, registerEventHandler } from './handDetection';
-import HandLandmarks from './handDetection/HandLandmarks';
+import { getLastHandsResults, registerEventHandler } from './handDetection';
+import * as HandLandmarks from './handDetection/HandLandmarks';
+import { forEachLandmarks } from './handDetection/utils';
 
+let _app = null;
+let _renderer = null;
+let interaction = null;
 
 /**
  * The application will create a canvas element for you that you
@@ -23,8 +27,9 @@ export async function pixiInit(container = document.body) {
         width: container.offsetWidth,
         height: container.offsetHeight,
     });
-    const { renderer } = app;
-    const { interaction } = renderer.plugins;
+    _app = app;
+    _renderer = app.renderer;
+    _interaction = app.renderer.plugins.interaction;
 
     container.appendChild(app.view);
 
@@ -35,8 +40,9 @@ export async function pixiInit(container = document.body) {
     const bunny = new Sprite(texture);
 
     // Setup the position of the bunny
-    bunny.x = renderer.width / 2;
-    bunny.y = renderer.height / 2;
+    bunny.scale.set(2);
+    bunny.x = _renderer.width / 2;
+    bunny.y = _renderer.height / 2;
 
     // Rotate around the center
     bunny.anchor.x = 0.5;
@@ -46,25 +52,51 @@ export async function pixiInit(container = document.body) {
     app.stage.addChild(bunny);
 
     // Listen for frame updates
-    app.ticker.add(() => {
-        // each frame we spin the bunny around a bit
-        bunny.rotation += 0.01;
-    });
-    // app.ticker.add(() => {
-    //     const mousePosition = interaction.mouse.global;
-    //     bunny.position = mousePosition;
-    // })
-	app.ticker.add(() => {
-		const handsResults = getLastHandsResults();
-		if (handsResults !== null) {
-			forEachLandmarks(handsResults, ({ landmarks, worldLandmarks }) => {
-				const fingertipLandmark = landmarks[HandLandmarks.INDEX_FINGER_TIP];
-				const scaledLandmarkX = lerp(fingertipLandmark.x, 1, 0, 0, renderer.width);
-				const scaledLandmarkY = lerp(fingertipLandmark.y, 0, 1, 0, renderer.height);
+    app.ticker.add(rotateSlowlyTicker(bunny));
+    // app.ticker.add(followMouseTicker(bunny));
+    // app.ticker.add(followIndexFingertipTicker(bunny));
 
-				bunny.position.x = scaledLandmarkX;
-				bunny.position.y = scaledLandmarkY;
-			})
-		}
-	});
+    const events = {
+        pinch: null,
+    };
+    const bunnyFollowPinchedFingers = followPinchedFingersTicker(bunny, events);
+    registerEventHandler('pinch', (event) => {
+        bunny.scale.set(0.8);
+        events.pinch = event;
+        // app.ticker.add(bunnyFollowPinchedFingers);
+    });
+    registerEventHandler('pinchRelease', (event) => {
+        bunny.scale.set(2);
+        events.pinch = event;
+        // app.ticker.remove(bunnyFollowPinchedFingers);
+    });
 }
+
+const rotateSlowlyTicker = (container) => () => {
+    // each frame we spin the bunny around a bit
+    container.rotation += 0.01;
+};
+
+const followMouseTicker = (container) => () => {
+    const mousePosition = _interaction.mouse.global;
+    container.position = mousePosition;
+};
+
+const followIndexFingertipTicker = (container) => () => {
+    const handsResults = getLastHandsResults();
+    if (handsResults !== null) {
+        forEachLandmarks(handsResults, ({ landmarks, worldLandmarks }) => {
+            const fingertipLandmark = landmarks[HandLandmarks.INDEX_FINGER_TIP];
+            const scaledLandmarkX = lerp(fingertipLandmark.x, 1, 0, 0, _renderer.width);
+            const scaledLandmarkY = lerp(fingertipLandmark.y, 0, 1, 0, _renderer.height);
+
+            container.position.x = scaledLandmarkX;
+            container.position.y = scaledLandmarkY;
+        })
+    }
+};
+
+const followPinchedFingersTicker = (container, events) => () => {
+    container.position.x = events.pinch.middleX;
+    container.position.y = events.pinch.middleY;
+};

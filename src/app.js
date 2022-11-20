@@ -10,9 +10,6 @@ function main() {
     container.style.height = CONTAINER_HEIGHT + 'px';
     pixiInit(container);
     mediaPipeInit(container);
-    registerEventHandler((event) => {
-
-    });
 };
 
 window.addEventListener('DOMContentLoaded', main);
