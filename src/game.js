@@ -9,13 +9,13 @@ import { extensions } from '@pixi/core';
 import { InteractionManager } from '@pixi/interaction';
 extensions.add(InteractionManager);
 
-import { getLastHandsResults, registerEventHandler } from './handDetection';
+import { getLastHandsResults, PINCH_RELEASE_THRESHOLD, PINCH_THRESHOLD, registerEventHandler } from './handDetection';
 import * as HandLandmarks from './handDetection/HandLandmarks';
 import { forEachLandmarks } from './handDetection/utils';
 
 let _app = null;
 let _renderer = null;
-let interaction = null;
+let _interaction = null;
 
 /**
  * The application will create a canvas element for you that you
@@ -61,14 +61,27 @@ export async function pixiInit(container = document.body) {
     };
     const bunnyFollowPinchedFingers = followPinchedFingersTicker(bunny, events);
     registerEventHandler('pinch', (event) => {
-        bunny.scale.set(0.8);
+        console.log('!!! pinch', event);
+        // bunny.scale.set(0.8);
         events.pinch = event;
-        // app.ticker.add(bunnyFollowPinchedFingers);
+        app.ticker.add(bunnyFollowPinchedFingers);
+    });
+    registerEventHandler('pinchMove', (event) => {
+        // console.log('pinchMove', event);
+        events.pinch = event;
+        if (event.pinched) {
+            bunny.position.x = event.middleX;
+            bunny.position.y = event.middleY;
+            const scale = lerp(event.pinchDistance, PINCH_THRESHOLD, PINCH_RELEASE_THRESHOLD, 1, 2);
+            console.log(scale);
+            bunny.scale.set(scale);
+        }
     });
     registerEventHandler('pinchRelease', (event) => {
+        console.log('!!! pinchRelease', event);
         bunny.scale.set(2);
         events.pinch = event;
-        // app.ticker.remove(bunnyFollowPinchedFingers);
+        app.ticker.remove(bunnyFollowPinchedFingers);
     });
 }
 

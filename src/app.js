@@ -1,5 +1,5 @@
 import { pixiInit } from './game';
-import { mediaPipeInit, registerEventHandler } from './handDetection';
+import { mediaPipeInit } from './handDetection';
 
 const CONTAINER_WIDTH = 900;
 const CONTAINER_HEIGHT = 640;

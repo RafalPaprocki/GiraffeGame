@@ -33,8 +33,8 @@ const _gestureState = {
 	}
 };
 
-const PINCH_THRESHOLD = 0.08;
-const PINCH_RELEASE_THRESHOLD = 0.12;
+export const PINCH_THRESHOLD = 0.08;
+export const PINCH_RELEASE_THRESHOLD = 0.12;
 
 
 /**
@@ -116,14 +116,22 @@ function _onResults(results) {
 			// _drawHandOverlays(results, ctx);
 		});
 		const pinchMeasurement = _calcPinchDistance(results)[0];
-		console.log('pinchMeasurement', pinchMeasurement);
-		if (!_gestureState.pinch.pinched && pinchMeasurement.pinchDist < PINCH_THRESHOLD) {
-			_gestureState.pinch.pinched = true;
-			_fireEvent('pinch', { pinched: true, ...pinchMeasurement });
-		} else if (_gestureState.pinch.pinched && pinchMeasurement.pinchDist > PINCH_RELEASE_THRESHOLD) {
+		let eventName;
+		if (!_gestureState.pinch.pinched && pinchMeasurement.pinchDistance < PINCH_THRESHOLD) {
+				_gestureState.pinch.pinched = true;
+				eventName = 'pinch';
+		} else if (_gestureState.pinch.pinched && pinchMeasurement.pinchDistance > PINCH_RELEASE_THRESHOLD) {
 			_gestureState.pinch.pinched = false;
-			_fireEvent('pinchRelease', { pinched: false, ...pinchMeasurement });
+			eventName = 'pinchRelease';
+		} else {
+			eventName = 'pinchMove';
 		}
+
+		const pinchEvent = {
+			pinched: _gestureState.pinch.pinched,
+			...pinchMeasurement,
+		};
+		_fireEvent(eventName, pinchEvent)
 	} else {
 		_lastHandsResults = null;
 		withCanvas(_overlayCanvasCtx, (ctx) => {
@@ -158,24 +166,20 @@ const _drawHandOverlays = (results, canvasCtx) => {
  * @param {Results} results Hands detestion results
  */
 const _calcPinchDistance = (results) => {
-	console.log('calcPichDist  start')
 	return forEachLandmarks(results, ({ landmarks }) => {
-		console.log('calcPichDist  forEach iteration')
 		const scaleLandmark = landmarkScaler(_containerWidth, _containerHeight);
 		const indexFingertipRaw = landmarks[INDEX_FINGER_TIP];
 		const thumbFingertipRaw = landmarks[THUMB_TIP];
 		const indexFingertip = scaleLandmark(indexFingertipRaw);
 		const thumbFingertip = scaleLandmark(thumbFingertipRaw);
-		console.log('calcPinchDist: index', indexFingertipRaw.x, indexFingertipRaw.y, indexFingertipRaw.z)
-		console.log('calcPinchDist: thumb', thumbFingertipRaw.x, thumbFingertipRaw.y, thumbFingertipRaw.z)
-		const pinchDist = _euclideanDistance(indexFingertipRaw.x, thumbFingertipRaw.x, indexFingertipRaw.y, thumbFingertipRaw.y)
-		const pinchDistRawPercent = Math.round(100 * pinchDist);
+		const pinchDistance = _euclideanDistance(indexFingertipRaw.x, thumbFingertipRaw.x, indexFingertipRaw.y, thumbFingertipRaw.y)
+		const pinchDistRawPercent = Math.round(100 * pinchDistance);
 		withCanvas(_overlayCanvasCtx, _markPinchDist(pinchDistRawPercent, indexFingertip, thumbFingertip), false);
 
 		const lineMiddlePoint = (x0, x1) => x0 + ((x1 - x0) / 2);
 		return {
-			pinchDist,
-			middleX: lineMiddlePoint(indexFingertip.x, thumbFingertip.x),
+			pinchDistance,
+			middleX: _containerWidth - lineMiddlePoint(indexFingertip.x, thumbFingertip.x),
 			middleY: lineMiddlePoint(indexFingertip.y, thumbFingertip.y),
 		};
 	});
@@ -187,7 +191,7 @@ const _euclideanDistance = (x0, x1, y0, y1) => {
 	return Math.sqrt(dX ** 2 + dY ** 2);
 };
 
-const _markPinchDist = (pinchDist, indexFingertip, thumbFingertip) => (ctx) => {
+const _markPinchDist = (pinchDistance, indexFingertip, thumbFingertip) => (ctx) => {
 	drawLine(ctx, indexFingertip.x, indexFingertip.y, thumbFingertip.x, thumbFingertip.y, '#BADA55');
 	drawCircle(ctx, indexFingertip.x, indexFingertip.y, 5, 'blue');
 	drawCircle(ctx, thumbFingertip.x, thumbFingertip.y, 5, 'red');
@@ -195,5 +199,5 @@ const _markPinchDist = (pinchDist, indexFingertip, thumbFingertip) => (ctx) => {
 	const middleX = lineMiddlePoint(indexFingertip.x, thumbFingertip.x);
 	const middleY = lineMiddlePoint(indexFingertip.y, thumbFingertip.y);
 	ctx.font = '25px serif-sans';
-	ctx.fillText(pinchDist, middleX, middleY);
+	ctx.fillText(pinchDistance, middleX, middleY);
 };
