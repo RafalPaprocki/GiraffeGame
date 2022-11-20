@@ -11,7 +11,7 @@ function main() {
     pixiInit(container);
     mediaPipeInit(container);
     registerEventHandler((event) => {
-        
+
     });
 };
 

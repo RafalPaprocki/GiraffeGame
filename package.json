@@ -2,6 +2,11 @@
   "name": "giraffe",
   "version": "1.0.0",
   "description": "",
+  "scripts": {
+    "start": "parcel src/index.html src/*/** assets/**",
+    "build": "parcel build src/index.html src/*/** assets/**",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
   "dependencies": {
     "@mediapipe/camera_utils": "^0.3.1640029074",
     "@mediapipe/drawing_utils": "^0.3.1620248257",
@@ -16,10 +21,6 @@
     "parcel": "^2.8.0",
     "punycode": "^1.4.1",
     "querystring-es3": "^0.2.1"
-  },
-  "scripts": {
-    "start": "parcel index.html assets/**",
-    "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",
   "license": "ISC"

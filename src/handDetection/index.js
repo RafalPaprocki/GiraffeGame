@@ -16,7 +16,13 @@ _hands.setOptions({
 
 let _overlayCanvasCtx;
 
-// const _eventHandlers = []; // TODO
+const _eventHandlers = {
+	pointTip: [],
+	pinch: [],
+	pinchRelease: [],
+	pinchMove: [],
+};
+export const GESTURE_EVENTS = Object.keys(_eventHandlers);
 
 
 /**
@@ -55,24 +61,32 @@ export function mediaPipeInit(container) {
 	camera.start();
 }
 
-// TODO //
-// /**
-//  * Registers gesture event handler
-//  * @param {Function} handler Event handler function
-//  */
-// export function registerEventHandler(handler) {
-// 	if (typeof handler === 'function') {
-// 		_eventHandlers.push(handler);
-// 	}
-// }
+/**
+ * Registers gesture event handler
+ * @param {Function} handler Event handler function
+ */
+export function registerEventHandler(eventName, handler) {
+	if (typeof handler === 'function' && GESTURE_EVENTS.includes(eventName)) {
+		_eventHandlers[eventName].push(handler);
+	}
+}
 
-// /**
-//  * Sends event to all registered event handlers
-//  * @param {GestureEvent} event Detected gesture event object
-//  */
-// function _notifyEvent(event) {
-// 	_eventHandlers.forEach((handler) => handler(event));
-// }
+export function removeEventHandler(eventName, handler) {
+	if (GESTURE_EVENTS.includes(eventName)) {
+		_eventHandlers[eventName] = _eventHandlers[eventName].filter(x => x !== handler);
+	}
+}
+
+/**
+ * Sends event to all registered event handlers
+ * @param {string} event Detected gesture event name
+ * @param {GestureEvent} event Detected gesture event object
+ */
+function _fireEvent(eventName, eventData) {
+	if (GESTURE_EVENTS.includes(eventName)) {
+		_eventHandlers.forEach((handler) => handler(eventData));
+	}
+}
 
 /**
  * On hands detection results callback
@@ -85,8 +99,9 @@ function _onResults(results) {
 		_lastHandsResults = results;
 		withCanvas(_overlayCanvasCtx, (ctx) => {
 			if (SHOW_VIDEO) ctx.drawImage(results.image, 0, 0, ctx.canvas.width, ctx.canvas.height);
-			_drawHandOverlays(results, ctx, true);
+			_drawHandOverlays(results, ctx);
 		});
+		_calcPinchDistance(results);
 	} else {
 		_lastHandsResults = null;
 		withCanvas(_overlayCanvasCtx, (ctx) => {
@@ -115,6 +130,15 @@ const _drawHandOverlays = (results, canvasCtx) => {
 		});
 	});
 }
+
+/**
+ * Calculate "pinch" distance (between index finger and thumb)
+ * @param {Results} results Hands detestion results
+ */
+const _calcPinchDistance = (results) => {
+	return -1;
+};
+
 
 const clearCanvas = (canvasCtx) => {
 	const { canvas } = canvasCtx;

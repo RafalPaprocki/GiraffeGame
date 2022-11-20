@@ -10,7 +10,7 @@ import { InteractionManager } from '@pixi/interaction';
 extensions.add(InteractionManager);
 
 import { forEachLandmarks, getLastHandsResults, registerEventHandler } from './handDetection';
-import HandLandmarks from './HandLandmarks';
+import HandLandmarks from './handDetection/HandLandmarks';
 
 
 /**
@@ -50,10 +50,10 @@ export async function pixiInit(container = document.body) {
         // each frame we spin the bunny around a bit
         bunny.rotation += 0.01;
     });
-    app.ticker.add(() => {
-        const mousePosition = interaction.mouse.global;
-        bunny.position = mousePosition;
-    })
+    // app.ticker.add(() => {
+    //     const mousePosition = interaction.mouse.global;
+    //     bunny.position = mousePosition;
+    // })
 	app.ticker.add(() => {
 		const handsResults = getLastHandsResults();
 		if (handsResults !== null) {
