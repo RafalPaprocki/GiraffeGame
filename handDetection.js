@@ -2,6 +2,7 @@ import { Hands, HAND_CONNECTIONS, Results } from "@mediapipe/hands";
 import { drawConnectors, drawLandmarks, lerp } from "@mediapipe/drawing_utils";
 import { Camera } from "@mediapipe/camera_utils";
 
+console.log('Initializing hands detection...')
 const _hands = new Hands({
 	locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`,
 });
@@ -15,12 +16,21 @@ _hands.setOptions({
 
 let _overlayCanvasCtx;
 
+// const _eventHandlers = []; // TODO
+
+
 /**
- * Initializs MediaPipe with hand detection
+ * Last detected raw hand detection results
+ * @returns {Results}
+ */
+export const getLastHandsResults = () => _lastHandsResults;
+let _lastHandsResults = null;
+
+/**
+ * Initializes MediaPipe with hand detection
  * @param container {HTMLElement}
  */
 export function mediaPipeInit(container) {
-	console.log('container', container)
 	const videoElement = document.createElement('video');
 	videoElement.width = container.offsetWidth;
 	videoElement.height = container.offsetHeight;
@@ -33,26 +43,56 @@ export function mediaPipeInit(container) {
 	container.appendChild(canvasElement);
 	_overlayCanvasCtx = canvasElement.getContext('2d');
 
-	_hands.onResults(onResults);
+	_hands.onResults(_onResults);
 
 	const camera = new Camera(videoElement, {
 		onFrame: async () => {
 			await _hands.send({ image: videoElement });
 		},
-		width: 1280,
-		height: 720
+		// width: 1280,
+		// height: 720
 	});
 	camera.start();
 }
+
+// TODO //
+// /**
+//  * Registers gesture event handler
+//  * @param {Function} handler Event handler function
+//  */
+// export function registerEventHandler(handler) {
+// 	if (typeof handler === 'function') {
+// 		_eventHandlers.push(handler);
+// 	}
+// }
+
+// /**
+//  * Sends event to all registered event handlers
+//  * @param {GestureEvent} event Detected gesture event object
+//  */
+// function _notifyEvent(event) {
+// 	_eventHandlers.forEach((handler) => handler(event));
+// }
 
 /**
  * On hands detection results callback
  * @param {Results} results Hands detection results
  */
-function onResults(results) {
-	console.log(results)
-	drawHandOverlays(results, _overlayCanvasCtx);
-	// updateHandLandmarks();
+function _onResults(results) {
+	const SHOW_VIDEO = true;
+
+	if (results.multiHandLandmarks.length && results.multiHandedness.length) {
+		_lastHandsResults = results;
+		withCanvas(_overlayCanvasCtx, (ctx) => {
+			if (SHOW_VIDEO) ctx.drawImage(results.image, 0, 0, ctx.canvas.width, ctx.canvas.height);
+			_drawHandOverlays(results, ctx, true);
+		});
+	} else {
+		_lastHandsResults = null;
+		withCanvas(_overlayCanvasCtx, (ctx) => {
+			if (SHOW_VIDEO) ctx.drawImage(results.image, 0, 0, ctx.canvas.width, ctx.canvas.height);
+		})
+	}
 }
 
 /**
@@ -60,60 +100,54 @@ function onResults(results) {
  * @param {Results} results
  * @param {CanvasRenderingContext2D} canvasCtx
  */
-function drawHandOverlays(results, canvasCtx) {
-	const { canvas } = canvasCtx;
-	canvasCtx.save();
-	canvasCtx.clearRect(0, 0, canvas.width, canvas.height);
-	canvasCtx.drawImage(results.image, 0, 0, canvas.width, canvas.height);
+const _drawHandOverlays = (results, canvasCtx) => {
+	forEachLandmarks(results, ({landmarks, isRightHand}) => {
+		drawConnectors(
+			canvasCtx, landmarks, HAND_CONNECTIONS,
+			{ color: isRightHand ? '#00FF00' : '#FF0000' }
+		);
+		drawLandmarks(canvasCtx, landmarks, {
+			color: isRightHand ? '#00FF00' : '#FF0000',
+			fillColor: isRightHand ? '#FF0000' : '#00FF00',
+			radius: (data) => {
+				return lerp(data.from.z, -0.15, .1, 10, 1);
+			}
+		});
+	});
+}
 
-	if (results.multiHandLandmarks && results.multiHandedness) {
-		for (let index = 0; index < results.multiHandLandmarks.length; index++) {
-			const classification = results.multiHandedness[index];
-			const isRightHand = classification.label === 'Right';
-			const landmarks = results.multiHandLandmarks[index];
-			drawConnectors(
-				canvasCtx, landmarks, HAND_CONNECTIONS,
-				{ color: isRightHand ? '#00FF00' : '#FF0000' }
-			);
-			drawLandmarks(canvasCtx, landmarks, {
-				color: isRightHand ? '#00FF00' : '#FF0000',
-				fillColor: isRightHand ? '#FF0000' : '#00FF00',
-				radius: (data) => {
-					return lerp(data.from.z, -0.15, .1, 10, 1);
-				}
-			});
-		}
+const clearCanvas = (canvasCtx) => {
+	const { canvas } = canvasCtx;
+	canvasCtx.clearRect(0, 0, canvas.width, canvas.height);
+}
+
+/**
+ * @param {CanvasRenderingContext2D} canvasCtx Canvas 2D context
+ */
+ const withCanvas = (canvasCtx, drawingFunction) => {
+	canvasCtx.save();
+	clearCanvas(canvasCtx);
+	if (typeof drawingFunction === 'function') {
+		drawingFunction(canvasCtx);
 	}
 	canvasCtx.restore();
 }
 
-// function updateHandLandmarks() {
-// 	if (results.multiHandWorldLandmarks) {
-// 		// We only get to call updateLandmarks once, so we need to cook the data to
-// 		// fit. The landmarks just merge, but the connections need to be offset.
-// 		const landmarks = results.multiHandWorldLandmarks.reduce(
-// 			(prev, current) => [...prev, ...current], []);
-// 		const colors = [];
-// 		/**
-// 		 * @param {LandmarkConnectionArray}
-// 		 */
-// 		const connections = [];
-// 		for (let loop = 0; loop < results.multiHandWorldLandmarks.length; ++loop) {
-// 			const offset = loop * mpHands.HAND_CONNECTIONS.length;
-// 			const offsetConnections =
-// 				mpHands.HAND_CONNECTIONS.map(
-// 					(connection) =>
-// 						[connection[0] + offset, connection[1] + offset]
-// 				);
-// 			connections = connections.concat(offsetConnections);
-// 			const classification = results.multiHandedness[loop];
-// 			colors.push({
-// 				list: offsetConnections.map((unused, i) => i + offset),
-// 				color: classification.label,
-// 			});
-// 		}
-// 		grid.updateLandmarks(landmarks, connections, colors);
-// 	} else {
-// 		grid.updateLandmarks([]);
-// 	}
-// }
+/**
+ * Do something for each result landmark
+ * @param {Results} results
+ * @param {Funnction} callback Calback to run for each result
+ */
+export const forEachLandmarks = (results, callback) => {
+	for (let index = 0; index < results.multiHandLandmarks.length; index++) {
+		const classification = results.multiHandedness[index];
+		const isRightHand = classification.label === 'Right';
+		const landmarks = results.multiHandLandmarks[index];
+		const worldLandmarks = results.multiHandWorldLandmarks[index];
+		callback({
+			isRightHand,
+			landmarks,
+			worldLandmarks,
+		});
+	}
+}

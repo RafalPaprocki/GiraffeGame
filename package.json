@@ -6,6 +6,8 @@
     "@mediapipe/camera_utils": "^0.3.1640029074",
     "@mediapipe/drawing_utils": "^0.3.1620248257",
     "@mediapipe/hands": "^0.4.1646424915",
+    "@pixi/core": "^7.0.4",
+    "@pixi/interaction": "^6.5.8",
     "device-detector-js": "^3.0.3",
     "pixi.js": "^7.0.4"
   },
